@@ -22,11 +22,19 @@ def main(args):
                                     valid_ratio=args.valid_ratio)
     train_loader, valid_loader = datasetwrapper.get_train_valid_dataloaders()
 
-    optimizer = optim.Adam(model.parameters(), 3e-4, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), 1e-3, )
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
     criterion = nn.CrossEntropyLoss()
 
+    train_losses = []
+    val_losses = []
+    best_loss = float('inf')
+
     for epoch in range(args.epochs):
+        train_loss = []
+        val_loss = []
+
         model.train()
         pbar = tqdm(train_loader)
         for x, y in pbar:
@@ -34,14 +42,52 @@ def main(args):
             x, y = x.to(device), y.to(device)
             pred = model(x)
             loss = criterion(pred, y)
+
             loss.backward()
             optimizer.step()
+            scheduler.step()
+
+            train_loss.append(loss.item())
+            pbar.set_description(f'E:{epoch+1:3d}|L:{loss.item():.4f}|lr:{scheduler.get_lr():.2e}')
+
+        train_loss = sum(train_loss) / len(train_loss)
+        train_losses.append(train_loss)
 
         model.eval()
         with torch.no_grad():
             pbar = tqdm(valid_loader)
             for x, y in pbar:
                 x, y = x.to(device), y.to(device)
+                pred = model(x)
+                loss = criterion(pred, y)
+
+                val_loss.append(loss.item())
+                pbar.set_description(f'VL:{loss.item():.4f}')
+
+            val_loss = sum(val_loss) / len(val_loss)
+            val_losses.append(val_loss)
+
+            if best_loss > val_loss:
+                best_loss = val_loss
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'best_loss': best_loss
+                }, './checkpoint/pointnet.ckpt')
+
+        if epoch+1 % 10 == 0:
+            torch.save({
+                'train_losses': train_losses,
+                'val_losses': val_losses,
+                'best_loss': best_loss
+            }, 'results.ckpt')
+
+    torch.save({
+        'train_losses': train_losses,
+        'val_losses': val_losses,
+        'best_loss': best_loss
+    }, 'results.ckpt')
 
 
 if __name__ == '__main__':
@@ -54,7 +100,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=128
+        default=32
     )
     parser.add_argument(
         '--num_workers',
