@@ -23,24 +23,38 @@ def read_off(filename):
     return xyz
 
 
+# class ModelNet40Dataset(Dataset):
+#
+#     def __init__(self, root='./dataset/ModelNet40', npoints=1024, split='train'):
+#         super(ModelNet40Dataset, self).__init__()
+#         self.npoints = npoints
+#         self.split = split
+#         self.df = pd.read_csv(os.path.join(root, f'{split}_list.csv'))
+#
+#     def __getitem__(self, idx):
+#         filename, y = self.df.loc[idx][1:]
+#         y = np.array(y)
+#         x = read_off(filename)
+#         indices = np.random.choice(np.arange(x.shape[0]), self.npoints, replace=True)
+#         x = x[indices]
+#         return x, y
+#
+#     def __len__(self):
+#         return len(self.df)
+
 class ModelNet40Dataset(Dataset):
 
-    def __init__(self, root='./dataset/ModelNet40', npoints=1024, split='train'):
-        super(ModelNet40Dataset, self).__init__()
-        self.npoints = npoints
+    def __init__(self, root='./dataset/ModelNet40/Tensor', split='train'):
+        self.root = root
         self.split = split
-        self.df = pd.read_csv(os.path.join(root, f'{split}_list.csv'))
+        self.file_list = [file for file in os.listdir(os.path.join(root, split)) if file[0] != '.']
 
     def __getitem__(self, idx):
-        filename, y = self.df.loc[idx][1:]
-        y = np.array(y)
-        x = read_off(filename)
-        indices = np.random.choice(np.arange(x.shape[0]), self.npoints, replace=True)
-        x = x[indices]
+        x, y = torch.load(os.path.join(self.root, self.split, self.file_list[idx]))
         return x, y
 
     def __len__(self):
-        return len(self.df)
+        return len(self.file_list)
 
 class DatasetWrapper(object):
     def __init__(self, batch_size, num_workers, valid_ratio):

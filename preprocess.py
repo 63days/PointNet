@@ -1,6 +1,10 @@
 import os
 import pandas as pd
+import torch
+import numpy as np
 import pickle
+from dataloader import read_off
+from tqdm import tqdm
 
 def make_dict(root='./dataset/ModelNet40'):
     cls_dict = {}
@@ -35,11 +39,50 @@ def make_csv(root='./dataset/ModelNet40', split='train'):
 
     df.to_csv(f'./dataset/{split}_list.csv')
 
+def make_tensor_file(root='./dataset/ModelNet40', npoints=1024):
+    train_df = pd.read_csv(os.path.join(root, 'train_list.csv'))
+    test_df = pd.read_csv(os.path.join(root, 'test_list.csv'))
+
+    ################ Train Dataset ################
+    pbar = tqdm(range(len(train_df)))
+    for i in pbar:
+        filename, y = train_df.loc[i][1:]
+        y = np.array(y)
+        x = read_off(filename)
+        indices = np.random.choice(np.arange(x.shape[0]), npoints, replace=True)
+        x = x[indices]
+        sample = (x, y)
+        filename = os.path.split(filename)[1][:-4]
+        torch.save(sample, f'./dataset/ModelNet40/Tensor/train/{filename}_{npoints}')
+    ################################################
+
+    ################## Test Dataset ################
+    pbar = tqdm(range(len(test_df)))
+    for i in pbar:
+        filename, y = test_df.loc[i][1:]
+        y = np.array(y)
+        x = read_off(filename)
+        indices = np.random.choice(np.arange(x.shape[0]), npoints, replace=True)
+        x = x[indices]
+        sample = (x, y)
+        filename = os.path.split(filename)[1][:-4]
+        torch.save(sample, f'./dataset/ModelNet40/Tensor/test/{filename}_{npoints}')
+    ################################################
+
+def make_tensor_list():
+    train_df = pd.DataFrame(columns=['filename'])
+    test_df = pd.DataFrame(columns=['filename'])
+
+
 
 if __name__ == '__main__':
 
     if os.path.isfile('./dataset/ModelNet40/cls_dict.pkl') == False:
         make_dict()
+    if os.path.isfile('./dataset/ModelNet40/train_list.csv') == False:
+        make_csv(split='train')
 
-    make_csv(split='train')
-    make_csv(split='test')
+    if os.path.isfile('./dataset/ModelNet40/test_list.csv') == False:
+        make_csv(split='test')
+
+    make_tensor_file(npoints=1024)
