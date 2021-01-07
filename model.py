@@ -85,8 +85,8 @@ class MLP(nn.Module):
     def __init__(self, num_features):
         super(MLP, self).__init__()
 
-        self.linear_list = []
-        self.bn_list = []
+        self.linear_list = nn.ModuleList()
+        self.bn_list = nn.ModuleList()
 
         for i in range(1, len(num_features)):
             self.linear_list.append(nn.Linear(num_features[i-1], num_features[i]))

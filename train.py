@@ -48,7 +48,7 @@ def main(args):
             scheduler.step()
 
             train_loss.append(loss.item())
-            pbar.set_description(f'E:{epoch+1:3d}|L:{loss.item():.4f}|lr:{scheduler.get_lr():.2e}')
+            pbar.set_description(f'E:{epoch+1:3d}|L:{loss.item():.4f}|lr:{scheduler.get_last_lr()[0]:.2e}')
 
         train_loss = sum(train_loss) / len(train_loss)
         train_losses.append(train_loss)
