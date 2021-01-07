@@ -76,7 +76,7 @@ def main(args):
                     'best_loss': best_loss
                 }, './checkpoint/pointnet.ckpt')
 
-        if epoch+1 % 10 == 0:
+        if (epoch+1) % 10 == 0:
             torch.save({
                 'train_losses': train_losses,
                 'val_losses': val_losses,
