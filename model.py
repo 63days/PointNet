@@ -23,8 +23,7 @@ class TNet(nn.Module): # Spatial Transformation Network
         self.bn4 = nn.BatchNorm1d(512)
         self.bn5 = nn.BatchNorm1d(256)
 
-        self.weights = torch.zeros([256, d*d], requires_grad=True, dtype=torch.float32, device=device)
-        self.bias = torch.eye(d, requires_grad=True, dtype=torch.float32, device=device).flatten()
+        self.fc6 = nn.Linear(256, d*d)
 
     def forward(self, x):
         x = F.relu(self.bn1(self.fc1(x).transpose(1, 2)), inplace=True)
@@ -38,8 +37,11 @@ class TNet(nn.Module): # Spatial Transformation Network
         x = F.relu(self.bn4(self.fc4(x)), inplace=True)
         x = F.relu(self.bn5(self.fc5(x)), inplace=True)
 
-        x = torch.matmul(x, self.weights)
-        x = x + self.bias
+        x = self.fc6(x)
+        iden = torch.autograd.Variable(torch.eye(self.d).flatten()).reshape(1, -1).repeat(x.size(0), 1).to(device)
+
+        x += iden
+
         x = x.reshape(-1, self.d, self.d)
 
         return x

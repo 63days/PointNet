@@ -22,42 +22,44 @@ def read_off(filename):
 
     return xyz
 
+class ModelNetDataset(Dataset):
 
-# class ModelNet40Dataset(Dataset):
-#
-#     def __init__(self, root='./dataset/ModelNet40', npoints=1024, split='train'):
-#         super(ModelNet40Dataset, self).__init__()
-#         self.npoints = npoints
-#         self.split = split
-#         self.df = pd.read_csv(os.path.join(root, f'{split}_list.csv'))
-#
-#     def __getitem__(self, idx):
-#         filename, y = self.df.loc[idx][1:]
-#         y = np.array(y)
-#         x = read_off(filename)
-#         indices = np.random.choice(np.arange(x.shape[0]), self.npoints, replace=True)
-#         x = x[indices]
-#         return x, y
-#
-#     def __len__(self):
-#         return len(self.df)
-
-class ModelNet40Dataset(Dataset):
-
-    def __init__(self, root='./dataset/ModelNet40/Tensor', split='train'):
+    def __init__(self, root, cls_dict, npoints=1024, split='train'):
         self.root = root
+        self.cls_dict = cls_dict
+        self.npoints = npoints
         self.split = split
-        self.file_list = [file for file in os.listdir(os.path.join(root, split)) if file[0] != '.']
+        self.filelist = np.genfromtxt(os.path.join(root, f'modelnet40_{split}.txt'), dtype=np.str)
 
     def __getitem__(self, idx):
-        x, y = torch.load(os.path.join(self.root, self.split, self.file_list[idx]))
-        return x, y
+        filename = self.filelist[idx]
+        dirname = filename[:-5]
+
+        pc = np.genfromtxt(os.path.join(self.root, dirname, filename, '.txt'), delimiter=',')[:, :3]
+        indices = np.random.choice(pc.shape[0], self.npoints, replace=True)
+        pc = pc[indices]
+        pc = self._normalize(pc)
+
+        label = self.cls_dict[dirname]
+
+        return pc, label
 
     def __len__(self):
-        return len(self.file_list)
+        return len(self.filelist)
+
+    def _normalize(self, pc):
+        centroid = np.mean(pc, axis=0)
+        pc -= centroid
+        dist = np.max(np.sqrt(np.sum(pc**2, axis=1)))
+        pc /= dist
+        return pc
+
+
+
 
 class DatasetWrapper(object):
-    def __init__(self, batch_size, num_workers, valid_ratio):
+    def __init__(self, cls_dict, batch_size, num_workers, valid_ratio):
+        self.cls_dict = cls_dict
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_ratio = valid_ratio
@@ -69,7 +71,7 @@ class DatasetWrapper(object):
             return self.get_testloader()
 
     def get_train_valid_dataloaders(self):
-        ds = ModelNet40Dataset(split='train')
+        ds = ModelNetDataset(cls_dict=self.cls_dict, split='train')
         num_data = len(ds)
         indices = np.arange(num_data)
         np.random.shuffle(indices)
@@ -85,7 +87,7 @@ class DatasetWrapper(object):
         return train_loader, valid_loader
 
     def get_test_dataloader(self):
-        ds = ModelNet40Dataset(split='test')
+        ds = ModelNetDataset(cls_dict=self.cls_dict, split='test')
         indices = np.arange(len(ds))
         np.random.shuffle(indices)
 
@@ -95,7 +97,7 @@ class DatasetWrapper(object):
         return test_loader
 
 if __name__ == '__main__':
-    ds = ModelNet40Dataset()
+    ds = ModelNetDataset()
     x, y = ds[0]
     x.astype('f4')
     print(x.dtype)
