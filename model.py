@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -51,6 +52,8 @@ class PointNet(nn.Module):
         self.mlp1 = MLP(num_features=[3, 64, 64])
         self.tnet64d = TNet(d=64)
         self.mlp2 = MLP(num_features=[64, 64, 128, 1024])
+        self.optimizer = optim.Adam(self.parameters(), lr=1e-3)
+        self.criterion = nn.CrossEntropyLoss()
 
         self.mlp3 = nn.Sequential(
             nn.Linear(1024, 512),
@@ -77,7 +80,37 @@ class PointNet(nn.Module):
 
         x = self.mlp3(x)
 
-        return x
+        return x, feature_transform
+
+    def train_batch(self, x, y):
+        self.optimizer.zero_grad()
+        x, y = x.to(device), y.to(device)
+        pred, feature_transform = self.forward(x)
+        loss = self.criterion(pred, y)
+
+        I_hat = torch.bmm(feature_transform, feature_transform.transpose(1, 2))
+        I = torch.diag(torch.ones(64, device=device))
+        reg_loss = ((I-I_hat)**2).sum()
+        loss += 1e-3 * reg_loss
+        loss.backward()
+        self.optimizer.step()
+
+        return loss.item()
+
+    def valid_batch(self, x, y):
+        self.eval()
+        x, y = x.to(device), y.to(device)
+        pred, _ = self.forward(x)
+        loss = self.criterion(pred, y)
+
+        pred = torch.argmax(pred, dim=-1)
+        acc_batch = (pred==y).float().mean().item()
+
+        return acc_batch, loss.item()
+
+
+
+
 
 
 class MLP(nn.Module):
